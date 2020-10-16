@@ -77,6 +77,7 @@ INSTALLED_APPS = [
     'crispy_forms',
     'sass_processor',
     'sorl.thumbnail',
+    'rest_framework',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -128,6 +129,15 @@ LOCALE_PATHS = [
 LANGUAGES = ('en', _('English'))
 
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
+
+# rest framework
+REST_FRAMEWORK = {
+    # Use Django's standard `django.contrib.auth` permissions,
+    # or allow read-only access for unauthenticated users.
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly'
+    ]
+}
 
 # Login and logout settings
 # https://docs.djangoproject.com/en/1.11/ref/settings/#login-redirect-url

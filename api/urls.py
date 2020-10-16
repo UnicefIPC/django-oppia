@@ -55,6 +55,7 @@ def get_api_v2():
 urlpatterns = [
     url(r'^', include(get_api_v1().urls)),
     url(r'^', include(get_api_v2().urls)),
+    path(r'v3/', include('api.v3.urls')),
     url(r'^publish/$', publish_view, name="oppia_publish"),
     url(r'^media/$', upload_view, name="oppia_upload_media_api"),
     url(r'^activitylog/$', post_activitylog, name="oppia_upload_activitylog"),
