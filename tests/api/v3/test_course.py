@@ -41,11 +41,11 @@ class CourseAPITest(OppiaTestCase):
             'api_key': get_api_key(user=self.teacher).key
         }
         self.url = '/api/v3/course/'
+        self.client = APIClient()
 
     # Post invalid
     def test_post_invalid(self):
-        client = APIClient()
-        response = client.post(self.url, format='json')
+        response = self.client.post(self.url, format='json')
         self.assertEqual(403, response.status_code)
 
     # test unauthorized
@@ -56,8 +56,7 @@ class CourseAPITest(OppiaTestCase):
             'username': 'demo',
             'api_key': '1234',
         }
-        client = APIClient()
-        response = client.get(self.url, data=data, format='json')
+        response = self.client.get(self.url, data=data, format='json')
         self.assertEqual(403, response.status_code)
 
     # test authorized
@@ -66,15 +65,12 @@ class CourseAPITest(OppiaTestCase):
             'username': 'demo',
             'api_key': '1234',
         }
-        client = APIClient()
-        response = client.get(self.url, data=data, format='json')
+        response = self.client.get(self.url, data=data, format='json')
         self.assertEqual(200, response.status_code)
 
     # test contains courses (and right no of courses)
     def test_has_courses(self):
-        client = APIClient()
-        response = client.get(
-            self.url, format='json', data=self.user_auth)
+        response = self.client.get(self.url, format='json', data=self.user_auth)
         self.assertEqual(200, response.status_code)
         response_data = json.loads(response.content)
         self.assertTrue('courses' in response_data)
@@ -91,10 +87,8 @@ class CourseAPITest(OppiaTestCase):
 
     
     def test_course_get_single(self):
-        client = APIClient()
         resource_url = self.url + "1/"
-        print(resource_url)
-        response = client.get(
+        response = self.client.get(
             resource_url, format='json', data=self.user_auth)
         self.assertEqual(200, response.status_code)
         course = json.loads(response.content)
@@ -108,25 +102,35 @@ class CourseAPITest(OppiaTestCase):
 
     
     def test_course_get_single_not_found(self):
-        client = APIClient()
         resource_url = self.url + "999/"
-        response = client.get(resource_url, format='json', data=self.user_auth)
+        response = self.client.get(
+            resource_url, format='json', data=self.user_auth)
         self.assertEqual(404, response.status_code)
 
-    '''
+    
     def test_course_get_single_draft_nonvisible(self):
-        resource_url = get_api_url('v3', 'course', 3)
-        resp = self.api_client.get(
+        resource_url = self.url + "3/"
+        response = self.client.get(
             resource_url, format='json', data=self.user_auth)
-        self.assertHttpNotFound(resp)
+        self.assertEqual(404, response.status_code)
 
+    @pytest.mark.xfail(reason="expected fail until v3 api fully developed")
+    @unittest.expectedFailure
     def test_course_get_single_draft_admin_visible(self):
-        resource_url = get_api_url('v3', 'course', 3)
-        resp = self.api_client.get(
+        resource_url = self.url + "3/"
+        response = self.client.get(
             resource_url, format='json', data=self.admin_auth)
-        self.assertHttpOK(resp)
-        self.assertValidJSON(resp.content)
+        self.assertEqual(200, response.status_code)
+        course = json.loads(response.content)
+        # check course format
+        self.assertTrue('shortname' in course)
+        self.assertTrue('title' in course)
+        self.assertTrue('description' in course)
+        self.assertTrue('version' in course)
+        self.assertTrue('author' in course)
+        self.assertTrue('organisation' in course)
 
+    '''
     def test_course_download_file_zip_not_found(self):
         resource_url = get_api_url('v3', 'course', 5) + self.STR_DOWNLOAD
         resp = self.api_client.get(
