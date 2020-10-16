@@ -25,7 +25,7 @@ class SectionSerializer(serializers.HyperlinkedModelSerializer):
         
     activities = ActivitySerializer(many=True)
 
-class CourseListSerializer(serializers.HyperlinkedModelSerializer):
+class CourseItemSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = Course
@@ -40,7 +40,8 @@ class CourseListSerializer(serializers.HyperlinkedModelSerializer):
         
     sections = SectionSerializer(many=True)
 
-class CourseItemSerializer(serializers.HyperlinkedModelSerializer):
+
+class CourseSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = Course
@@ -52,6 +53,7 @@ class CourseItemSerializer(serializers.HyperlinkedModelSerializer):
                   'is_draft',
                   'description']
 
+
 class CourseViewSet(viewsets.ModelViewSet):
     queryset = Course.objects.filter(is_archived=False, is_draft=False)
     http_method_names = ['get']
@@ -59,12 +61,12 @@ class CourseViewSet(viewsets.ModelViewSet):
     def __init__(self, *args, **kwargs):
         super(CourseViewSet, self).__init__(*args, **kwargs)
         self.serializer_action_classes = {
-            'list': CourseItemSerializer,
-            'create': CourseListSerializer,
-            'retrieve': CourseListSerializer,
-            'update': CourseListSerializer,
-            'partial_update': CourseListSerializer,
-            'destroy': CourseListSerializer,
+            'list': CourseSerializer,
+            'create': CourseSerializer,
+            'retrieve': CourseItemSerializer,
+            'update': CourseSerializer,
+            'partial_update': CourseSerializer,
+            'destroy': CourseSerializer,
         }
         
     def get_serializer_class(self, *args, **kwargs):
@@ -74,6 +76,7 @@ class CourseViewSet(viewsets.ModelViewSet):
             return self.serializer_action_classes[self.action]
         except (KeyError, AttributeError):
             return super(CourseViewSet, self).get_serializer_class()
+
 
 class SectionViewSet(viewsets.ModelViewSet):
     queryset = Section.objects.filter(course__is_archived=False, course__is_draft=False)
