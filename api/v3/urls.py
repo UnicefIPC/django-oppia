@@ -7,8 +7,8 @@ from api.v3.tag import TagViewSet
 
 # Routers provide an easy way of automatically determining the URL conf.
 router = routers.DefaultRouter()
-router.register(r'courses', CourseViewSet)
-router.register(r'tags', TagViewSet)
+router.register(r'course', CourseViewSet)
+router.register(r'tag', TagViewSet)
 router.register(r'section', SectionViewSet)
 router.register(r'activity', ActivityViewSet)
 

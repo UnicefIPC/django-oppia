@@ -51,7 +51,7 @@ class PointsResourceTest(ResourceTestCaseMixin, TestCase):
     def test_get_leaderboard(self):
         auth_header = self.create_apikey(username=self.username,
                                          api_key=self.api_key)
-        res = self.api_client.get('/api/v1/leaderboard/',
+        res = self.api_client.get('/api/v2/leaderboard/',
                                   format='json',
                                   authentication=auth_header)
         self.assertHttpOK(res)

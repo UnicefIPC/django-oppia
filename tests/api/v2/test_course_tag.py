@@ -7,7 +7,7 @@ from tastypie.test import ResourceTestCaseMixin
 class CourseTagResourceTest(ResourceTestCaseMixin, TestCase):
     def setUp(self):
         super(CourseTagResourceTest, self).setUp()
-        self.url = '/api/v1/coursetag/'
+        self.url = '/api/v2/coursetag/'
 
     # check get not allowed
     def test_get_not_found(self):

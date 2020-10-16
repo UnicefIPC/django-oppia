@@ -1,7 +1,22 @@
-from rest_framework import routers, serializers, viewsets
+
+from django.contrib.auth.models import User
+
+from rest_framework import routers, serializers, viewsets, pagination
+from rest_framework.response import Response
 
 from oppia.models import Course, Section, Activity
 
+
+class CoursePagination(pagination.PageNumberPagination):
+    def get_paginated_response(self, data):
+        return Response({
+            'links': {
+                'next': self.get_next_link(),
+                'previous': self.get_previous_link()
+            },
+            'count': self.page.paginator.count,
+            'courses': data
+        })
 
 class ActivitySerializer(serializers.HyperlinkedModelSerializer):
 
@@ -25,7 +40,45 @@ class SectionSerializer(serializers.HyperlinkedModelSerializer):
         
     activities = ActivitySerializer(many=True)
 
+
+class AuthorSerializer(serializers.HyperlinkedModelSerializer):
+
+    class Meta:
+        model = User
+        fields = ['first_name']
+
+
 class CourseItemSerializer(serializers.HyperlinkedModelSerializer):
+    
+    author = serializers.SerializerMethodField()
+    organisation = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Course
+        fields = ['url',
+                  'title',
+                  'version',
+                  'shortname',
+                  'priority',
+                  'is_draft',
+                  'description',
+                  'sections',
+                  'author',
+                  'organisation']
+        
+    sections = SectionSerializer(many=True)
+    
+    def get_author(self, obj):
+        return obj.user.first_name  + " " + obj.user.last_name
+
+    def get_organisation(self, obj):
+        return obj.user.userprofile.organisation
+
+
+class CourseSerializer(serializers.HyperlinkedModelSerializer):
+
+    author = serializers.SerializerMethodField()
+    organisation = serializers.SerializerMethodField()
 
     class Meta:
         model = Course
@@ -36,27 +89,20 @@ class CourseItemSerializer(serializers.HyperlinkedModelSerializer):
                   'priority',
                   'is_draft',
                   'description',
-                  'sections']
-        
-    sections = SectionSerializer(many=True)
+                  'author',
+                  'organisation']
 
+    def get_author(self, obj):
+        return obj.user.first_name  + " " + obj.user.last_name
 
-class CourseSerializer(serializers.HyperlinkedModelSerializer):
-
-    class Meta:
-        model = Course
-        fields = ['url',
-                  'title',
-                  'version',
-                  'shortname',
-                  'priority',
-                  'is_draft',
-                  'description']
+    def get_organisation(self, obj):
+        return obj.user.userprofile.organisation
 
 
 class CourseViewSet(viewsets.ModelViewSet):
     queryset = Course.objects.filter(is_archived=False, is_draft=False)
     http_method_names = ['get']
+    pagination_class = CoursePagination
 
     def __init__(self, *args, **kwargs):
         super(CourseViewSet, self).__init__(*args, **kwargs)
@@ -70,7 +116,6 @@ class CourseViewSet(viewsets.ModelViewSet):
         }
         
     def get_serializer_class(self, *args, **kwargs):
-        """Instantiate the list of serializers per action from class attribute (must be defined)."""
         kwargs['partial'] = True
         try:
             return self.serializer_action_classes[self.action]
@@ -79,7 +124,8 @@ class CourseViewSet(viewsets.ModelViewSet):
 
 
 class SectionViewSet(viewsets.ModelViewSet):
-    queryset = Section.objects.filter(course__is_archived=False, course__is_draft=False)
+    queryset = Section.objects.filter(course__is_archived=False,
+                                      course__is_draft=False)
     serializer_class = SectionSerializer
     http_method_names = ['get']
 
