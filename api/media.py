@@ -8,6 +8,7 @@ from django.utils.translation import ugettext_lazy as _
 from django.views.decorators.csrf import csrf_exempt
 
 from api.publish import get_messages_array
+from av import constants
 from av import handler
 from av.models import UploadedMedia
 
@@ -54,7 +55,10 @@ def get_view(request, digest):
                 'digest': media.md5,
                 'filesize': media.get_filesize(),
                 'download_url': request.build_absolute_uri(media.file.url),
-                'length': media.length}
+                'length': media.length,
+                'title': media.title,
+                'organisation': media.organisation,
+                'license': media.license}
     return JsonResponse(resp_obj, status=200)
 
 
@@ -73,16 +77,17 @@ def upload_view(request):
 
     result = handler.upload(request, user)
 
-    if result['result'] == UploadedMedia.UPLOAD_STATUS_SUCCESS:
+    if result['result'] == constants.UPLOAD_MEDIA_STATUS_SUCCESS:
         media = result['media']
         embed_code = media.get_embed_code(
             request.build_absolute_uri(media.file.url))
 
         return JsonResponse({'embed_code': embed_code,
                              'digest': media.md5,
+                             'length': media.length,
                              'filesize': media.get_filesize(),
-                             'download_url': request.build_absolute_uri(
-                                 media.file.url)}, status=201)
+                             'download_url': request.build_absolute_uri(media.file.url)
+                             }, status=201)
     else:
         response = {'messages': result['errors']}
         return JsonResponse(response, status=400)

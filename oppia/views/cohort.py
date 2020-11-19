@@ -5,12 +5,11 @@ import operator
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator, InvalidPage, EmptyPage
-from django.db.models import Count
-from django.db.models.functions import TruncDay, TruncMonth, TruncYear
 from django.http import HttpResponseRedirect, Http404
 from django.shortcuts import render
 from django.utils import timezone
 
+from oppia import constants
 from oppia.forms.cohort import CohortForm
 from oppia.models import Tracker, \
     CourseCohort, \
@@ -20,11 +19,9 @@ from oppia.models import Tracker, \
 from oppia.permissions import can_add_cohort, \
     can_view_cohort, \
     can_edit_cohort
-from oppia.views.utils import get_paginated_courses
+from oppia.views.utils import get_paginated_courses, filter_trackers
 from profile.views.utils import get_paginated_users
 from summary.models import UserCourseSummary
-
-STR_DATE_FORMAT = "%d %b %Y"
 
 
 def cohort_list_view(request):
@@ -105,35 +102,22 @@ def cohort_add(request):
 def cohort_view(request, cohort_id):
     cohort = can_view_cohort(request, cohort_id)
 
-    start_date = timezone.now() - datetime.timedelta(days=31)
+    start_date = timezone.now() - datetime.timedelta(
+        days=constants.ACTIVITY_GRAPH_DEFAULT_NO_DAYS)
     end_date = timezone.now()
 
     # get student activity
-    student_activity = []
-    no_days = (end_date - start_date).days + 1
     students = User.objects.filter(participant__role=Participant.STUDENT,
                                    participant__cohort=cohort)
     trackers = Tracker.objects \
         .filter(course__coursecohort__cohort=cohort,
                 user__is_staff=False,
-                user__in=students,
-                tracker_date__gte=start_date,
-                tracker_date__lte=end_date) \
-        .annotate(day=TruncDay('tracker_date'),
-                  month=TruncMonth('tracker_date'),
-                  year=TruncYear('tracker_date')) \
-        .values('day') \
-        .annotate(count=Count('id'))
-    for i in range(0, no_days, +1):
-        temp = start_date + datetime.timedelta(days=i)
-        temp_date = temp.date().strftime(STR_DATE_FORMAT)
-        count = next((dct['count']
-                     for dct in trackers
-                     if dct['day'].strftime(STR_DATE_FORMAT) == temp_date), 0)
-        student_activity.append([temp_date, count])
+                user__in=students)
+    student_activity = filter_trackers(trackers, start_date, end_date)
 
     # get leaderboard
-    leaderboard = cohort.get_leaderboard(10)
+    leaderboard = cohort.get_leaderboard(
+        constants.LEADERBOARD_HOMEPAGE_RESULTS_PER_PAGE)
 
     return render(request, 'cohort/activity.html',
                   {'cohort': cohort,
@@ -148,7 +132,7 @@ def cohort_leaderboard_view(request, cohort_id):
     # get leaderboard
     lb = cohort.get_leaderboard(0)
 
-    paginator = Paginator(lb, 25)  # Show 25 contacts per page
+    paginator = Paginator(lb, constants.LEADERBOARD_TABLE_RESULTS_PER_PAGE)
 
     # Make sure page request is an int. If not, deliver first page.
     try:
@@ -233,30 +217,18 @@ def cohort_course_view(request, cohort_id, course_id):
     except Course.DoesNotExist:
         raise Http404()
 
-    start_date = timezone.now() - datetime.timedelta(days=31)
+    start_date = timezone.now() - datetime.timedelta(
+            days=constants.ACTIVITY_GRAPH_DEFAULT_NO_DAYS)
     end_date = timezone.now()
-    student_activity = []
-    no_days = (end_date - start_date).days + 1
+
     users = User.objects.filter(
         participant__role=Participant.STUDENT,
         participant__cohort=cohort).order_by('first_name', 'last_name')
     trackers = Tracker.objects.filter(course=course,
                                       user__is_staff=False,
-                                      user__in=users,
-                                      tracker_date__gte=start_date,
-                                      tracker_date__lte=end_date) \
-        .annotate(day=TruncDay('tracker_date'),
-                  month=TruncMonth('tracker_date'),
-                  year=TruncYear('tracker_date')) \
-        .values('day') \
-        .annotate(count=Count('id'))
-    for i in range(0, no_days, +1):
-        temp = start_date + datetime.timedelta(days=i)
-        temp_date = temp.date().strftime(STR_DATE_FORMAT)
-        count = next((dct['count']
-                     for dct in trackers
-                     if dct['day'].strftime(STR_DATE_FORMAT) == temp_date), 0)
-        student_activity.append([temp.strftime(STR_DATE_FORMAT), count])
+                                      user__in=users)
+
+    student_activity = filter_trackers(trackers, start_date, end_date)
 
     students = []
     media_count = course.get_no_media()

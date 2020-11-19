@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% load display_functions %}
+
+{% block extra_head_title %}
+	{% trans 'Analytics/Reports' %}
+{% endblock extra_head_title %}
+
+{% block header %}
+<div class="jumbotron mb-4">
+	<h3>{% trans 'Analytics/Reports' %}</h3>
+</div>
+{% endblock header %}
+
+{% block content %}
+	<div class="table-responsive">
+         <table class="table table-striped">
+         <caption class="d-none">{% trans 'Analytics/Reports' %}</caption>
+			 <thead>
+                <tr>
+                  <th scope="col">&nbsp;</th>
+                  <th scope="col">{% trans 'Title' %}</th>
+                  <th scope="col">{% trans 'Description' %}</th>
+                </tr>
+              </thead>
+              <tbody>
+				{% for report in OPPIA_REPORTS %}
+	                <tr>
+	                  <td><em class="material-icons mr-3">{{ report.icon }}</em></td>
+	                  <td><a class="nav-link" href="{{ report.url }}">
+	                   {{ report.name }}
+	                </a></td>
+	                <td>{{ report.description }}</td>
+                	</tr>
+	            {% endfor %}
+              </tbody>
+ 		</table>
+		</div>
+
+{% endblock content %}

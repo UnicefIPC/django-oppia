@@ -21,95 +21,111 @@ from oppia.models import Tracker, \
     Course, \
     CoursePermissions
 from oppia import permissions
+from oppia import constants
 from reports.signals import dashboard_accessed
 from summary.models import CourseDailyStats, UserCourseSummary
 
 from profile.models import UserProfile
 
-STR_DATE_FORMAT = "%d %b %Y"
+
+class ServerView(TemplateView):
+
+    def get(self, request):
+        return render(request, 'oppia/server.html',
+                      {'settings': settings},
+                      content_type="application/json")
 
 
-def server_view(request):
-    return render(request, 'oppia/server.html',
-                  {'settings': settings},
-                  content_type="application/json")
+class AboutView(TemplateView):
+
+    def get(self, request):
+        return render(request, 'oppia/about.html',
+                      {'settings': settings})
 
 
-def about_view(request):
-    return render(request, 'oppia/about.html',
-                  {'settings': settings})
+class HomeView(TemplateView):
 
+    def get(self, request):
+        return self.process(request)
 
-def home_view(request):
+    def post(self, request):
+        return self.process(request)
 
-    if request.user.is_authenticated:
+    def process(self, request):
 
-        # create profile if none exists (for first admin user login and
-        # historical for very old users)
-        try:
-            request.user.userprofile
-        except UserProfile.DoesNotExist:
-            up = UserProfile()
-            up.user = request.user
-            up.save()
+        if request.user.is_authenticated:
 
-        up = request.user.userprofile
-        # if user is student redirect to their scorecard
-        if up.is_student_only():
-            return HttpResponseRedirect(reverse('profile:user_activity',
-                                                args=[request.user.id]))
+            # create profile if none exists (for first admin user login and
+            # historical for very old users)
+            try:
+                request.user.userprofile
+            except UserProfile.DoesNotExist:
+                up = UserProfile()
+                up.user = request.user
+                up.save()
 
-        # is user is teacher redirect to teacher home
-        if up.is_teacher_only():
-            return HttpResponseRedirect(reverse('oppia:teacher_index'))
+            up = request.user.userprofile
+            # if user is student redirect to their scorecard
+            if up.is_student_only():
+                return HttpResponseRedirect(reverse('profile:user_activity',
+                                                    args=[request.user.id]))
 
-        if permissions.is_manager_only(request.user):
-            return HttpResponseRedirect(reverse('oppia:manager_index'))
+            # is user is teacher redirect to teacher home
+            if up.is_teacher_only():
+                return HttpResponseRedirect(reverse('oppia:teacher_index'))
 
-        # admin/staff view
-        form, activity = home_view_admin_authenticated(request)
-        leaderboard = Points.get_leaderboard(10)
-    else:
+            if permissions.is_manager_only(request.user):
+                return HttpResponseRedirect(reverse('oppia:manager_index'))
+
+            # admin/staff view
+            form, activity = self.admin_authenticated(request)
+            leaderboard = Points.get_leaderboard(
+                constants.LEADERBOARD_HOMEPAGE_RESULTS_PER_PAGE)
+        else:
+            activity = []
+            leaderboard = None
+            form = None
+
+        return render(request, 'oppia/home.html',
+                      {'form': form,
+                       'activity_graph_data': activity,
+                       'leaderboard': leaderboard})
+
+    def admin_authenticated(self, request):
         activity = []
-        leaderboard = None
-        form = None
 
-    return render(request, 'oppia/home.html',
-                  {'form': form,
-                   'activity_graph_data': activity,
-                   'leaderboard': leaderboard})
+        dashboard_accessed.send(sender=None, request=request, data=None)
 
+        start_date = timezone.now() - datetime.timedelta(
+            days=constants.ACTIVITY_GRAPH_DEFAULT_NO_DAYS)
+        end_date = timezone.now()
+        interval = 'days'
+        if request.method == 'POST':
+            form = DateRangeIntervalForm(request.POST)
+            if form.is_valid():
+                start_date = form.cleaned_data.get("start_date")
+                start_date = datetime.datetime.strptime(start_date,
+                                                        "%Y-%m-%d")
+                end_date = form.cleaned_data.get("end_date")
+                end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
+                interval = form.cleaned_data.get("interval")
+        else:
+            data = {}
+            data['start_date'] = start_date
+            data['end_date'] = end_date
+            data['interval'] = interval
+            form = DateRangeIntervalForm(initial=data)
 
-def home_view_admin_authenticated(request):
-    activity = []
+        if interval == 'days':
+            activity = process_home_activity_days(activity,
+                                                  start_date,
+                                                  end_date)
+        else:
+            activity = process_home_activity_months(activity,
+                                                    start_date,
+                                                    end_date)
 
-    dashboard_accessed.send(sender=None, request=request, data=None)
-
-    start_date = timezone.now() - datetime.timedelta(days=31)
-    end_date = timezone.now()
-    interval = 'days'
-    if request.method == 'POST':
-        form = DateRangeIntervalForm(request.POST)
-        if form.is_valid():
-            start_date = form.cleaned_data.get("start_date")
-            start_date = datetime.datetime.strptime(start_date,
-                                                    "%Y-%m-%d")
-            end_date = form.cleaned_data.get("end_date")
-            end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
-            interval = form.cleaned_data.get("interval")
-    else:
-        data = {}
-        data['start_date'] = start_date
-        data['end_date'] = end_date
-        data['interval'] = interval
-        form = DateRangeIntervalForm(initial=data)
-
-    if interval == 'days':
-        activity = process_home_activity_days(activity, start_date, end_date)
-    else:
-        activity = process_home_activity_months(activity, start_date, end_date)
-
-    return form, activity
+        return form, activity
 
 
 def process_home_activity_days(activity, start_date, end_date):
@@ -125,7 +141,7 @@ def process_home_activity_days(activity, start_date, end_date):
         count = next((dct['count']
                       for dct in tracker_stats
                       if dct['day'] == temp.date()), 0)
-        activity.append([temp.strftime(STR_DATE_FORMAT), count])
+        activity.append([temp.strftime(constants.STR_DATE_FORMAT), count])
     return activity
 
 
@@ -150,46 +166,61 @@ def process_home_activity_months(activity, start_date, end_date):
     return activity
 
 
-def manager_home_view(request):
-    if not permissions.is_manager_only(request.user):
-        raise PermissionDenied
+class ManagerView(TemplateView):
 
-    courses = Course.objects.filter(
-        coursepermissions__user=request.user,
-        coursepermissions__role=CoursePermissions.MANAGER)
+    def get(self, request):
+        return self.process(request)
 
-    start_date = timezone.now() - datetime.timedelta(days=31)
-    end_date = timezone.now()
+    def post(self, request):
+        return self.process(request)
 
-    # get activity
-    activity = get_trackers(start_date, end_date, courses)
+    def process(self, request):
+        if not permissions.is_manager_only(request.user):
+            raise PermissionDenied
 
-    dashboard_accessed.send(sender=None, request=request, data=None)
+        courses = Course.objects.filter(
+            coursepermissions__user=request.user,
+            coursepermissions__role=CoursePermissions.MANAGER)
 
-    return render(request, 'oppia/home-manager.html',
-                  {'courses': courses,
-                   'activity_graph_data': activity, })
+        start_date = timezone.now() - datetime.timedelta(
+            days=constants.ACTIVITY_GRAPH_DEFAULT_NO_DAYS)
+        end_date = timezone.now()
+
+        # get activity
+        activity = get_trackers(start_date, end_date, courses)
+
+        dashboard_accessed.send(sender=None, request=request, data=None)
+
+        return render(request, 'oppia/home-manager.html',
+                      {'courses': courses,
+                       'activity_graph_data': activity, })
 
 
-def teacher_home_view(request):
-    cohorts = permissions.get_cohorts(request)
+class TeacherView(TemplateView):
 
-    start_date = timezone.now() - datetime.timedelta(days=31)
-    end_date = timezone.now()
+    def get(self, request):
+        return self.process(request)
 
-    # get student activity
-    students = User.objects \
-        .filter(participant__role=Participant.STUDENT,
-                participant__cohort__in=cohorts).distinct()
-    courses = Course.objects \
-        .filter(coursecohort__cohort__in=cohorts).distinct()
-    activity = get_trackers(start_date, end_date, courses, students)
+    def process(self, request):
+        cohorts = permissions.get_cohorts(request)
 
-    dashboard_accessed.send(sender=None, request=request, data=None)
+        start_date = timezone.now() - datetime.timedelta(
+            days=constants.ACTIVITY_GRAPH_DEFAULT_NO_DAYS)
+        end_date = timezone.now()
 
-    return render(request, 'oppia/home-teacher.html',
-                  {'cohorts': cohorts,
-                   'activity_graph_data': activity, })
+        # get student activity
+        students = User.objects \
+            .filter(participant__role=Participant.STUDENT,
+                    participant__cohort__in=cohorts).distinct()
+        courses = Course.objects \
+            .filter(coursecohort__cohort__in=cohorts).distinct()
+        activity = get_trackers(start_date, end_date, courses, students)
+
+        dashboard_accessed.send(sender=None, request=request, data=None)
+
+        return render(request, 'oppia/home-teacher.html',
+                      {'cohorts': cohorts,
+                       'activity_graph_data': activity, })
 
 
 def get_trackers(start_date, end_date, courses, students=None):
@@ -209,31 +240,30 @@ def get_trackers(start_date, end_date, courses, students=None):
         .annotate(count=Count('id'))
     for i in range(0, no_days, +1):
         temp = start_date + datetime.timedelta(days=i)
-        temp_date = temp.date().strftime(STR_DATE_FORMAT)
+        temp_date = temp.date().strftime(constants.STR_DATE_FORMAT)
         count = next((dct['count']
                      for dct in trackers
-                     if dct['day'].strftime(STR_DATE_FORMAT) == temp_date), 0)
-        activity.append([temp.strftime(STR_DATE_FORMAT), count])
+                     if dct['day'].strftime(constants.STR_DATE_FORMAT)
+                     == temp_date), 0)
+        activity.append([temp.strftime(constants.STR_DATE_FORMAT), count])
     return activity
 
 
-def leaderboard_view(request):
-    lb = Points.get_leaderboard()
-    paginator = Paginator(lb, 25)  # Show 25 per page
+class LeaderboardView(TemplateView):
 
-    # Make sure page request is an int. If not, deliver first page.
-    try:
-        page = int(request.GET.get('page', '1'))
-    except ValueError:
-        page = 1
+    def get(self, request):
+        lb = Points.get_leaderboard()
+        paginator = Paginator(lb, constants.LEADERBOARD_TABLE_RESULTS_PER_PAGE)
+        try:
+            page = int(request.GET.get('page', '1'))
+        except ValueError:
+            page = 1
+        try:
+            leaderboard = paginator.page(page)
+        except (EmptyPage, InvalidPage):
+            leaderboard = paginator.page(paginator.num_pages)
 
-    # If page request (9999) is out of range, deliver last page of results.
-    try:
-        leaderboard = paginator.page(page)
-    except (EmptyPage, InvalidPage):
-        leaderboard = paginator.page(paginator.num_pages)
-
-    return render(request, 'oppia/leaderboard.html', {'page': leaderboard})
+        return render(request, 'oppia/leaderboard.html', {'page': leaderboard})
 
 
 class AppLauncherDetailView(TemplateView):

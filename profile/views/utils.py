@@ -1,15 +1,12 @@
-import datetime
 
 from django import forms
 from django.contrib.auth.models import User
 from django.core.paginator import Paginator
-from django.db.models import Count, Q
-from django.db.models.functions import TruncDay, TruncMonth, TruncYear
+from django.db.models import Q
 from django.urls import reverse
 
 from oppia.models import Tracker
-
-STR_DATE_FORMAT = "%d %b %Y"
+from oppia.views.utils import filter_trackers
 
 
 def filter_redirect(request_content):
@@ -72,28 +69,11 @@ def get_tracker_activities(start_date,
                            user,
                            course_ids=[],
                            course=None):
-    activity = []
-    no_days = (end_date - start_date).days + 1
     if course:
         trackers = Tracker.objects.filter(course=course)
     else:
         trackers = Tracker.objects.filter(course__id__in=course_ids)
 
-    trackers = trackers.filter(user=user,
-                               tracker_date__gte=start_date,
-                               tracker_date__lte=end_date) \
-                       .annotate(day=TruncDay('tracker_date'),
-                                 month=TruncMonth('tracker_date'),
-                                 year=TruncYear('tracker_date')) \
-                       .values('day') \
-                       .annotate(count=Count('id'))
+    trackers = trackers.filter(user=user)
 
-    for i in range(0, no_days, +1):
-        temp = start_date + datetime.timedelta(days=i)
-        temp_date = temp.date().strftime(STR_DATE_FORMAT)
-        count = next((dct['count']
-                     for dct in trackers
-                     if dct['day'].strftime(STR_DATE_FORMAT) == temp_date), 0)
-        activity.append([temp_date, count])
-
-    return activity
+    return filter_trackers(trackers, start_date, end_date)

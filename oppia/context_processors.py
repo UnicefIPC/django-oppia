@@ -4,7 +4,7 @@ import oppia
 
 from django.conf import settings
 from oppia.models import Points, Award
-from reports.views import menu_reports
+from reports.menu import menu_reports
 from settings import constants
 from settings.models import SettingProperties
 
@@ -53,10 +53,6 @@ def get_settings(request):
                                 constants.OPPIA_GOOGLE_ANALYTICS_DOMAIN,
                                 settings.OPPIA_GOOGLE_ANALYTICS_DOMAIN)
 
-    map_viz_enabled = SettingProperties.get_bool(
-                                constants.OPPIA_MAP_VISUALISATION_ENABLED,
-                                False)
-
     cron_warning = False
     last_cron = SettingProperties.get_string(
         constants.OPPIA_CRON_LAST_RUN, None)
@@ -93,5 +89,4 @@ def get_settings(request):
         'OPPIA_SHOW_GRAVATARS': show_gravatars,
         'OPPIA_REPORTS': menu_reports(request),
         'DEBUG': settings.DEBUG,
-        'CRON_WARNING': cron_warning,
-        'OPPIA_MAP_VISUALISATION_ENABLED': map_viz_enabled}
+        'CRON_WARNING': cron_warning}

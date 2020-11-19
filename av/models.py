@@ -18,10 +18,6 @@ EMBED_TEMPLATE = "[[media object='{\"filename\":\"%s\", \
 
 class UploadedMedia(models.Model):
 
-    UPLOAD_STATUS_SUCCESS = 1
-    UPLOAD_STATUS_EXISTS = 2
-    UPLOAD_STATUS_FAILURE = 0
-
     create_user = models.ForeignKey(User,
                                     related_name='media_create_user',
                                     null=True,
@@ -37,6 +33,9 @@ class UploadedMedia(models.Model):
     file = models.FileField(upload_to="uploaded/%Y/%m/", blank=False)
     md5 = models.CharField(max_length=100)
     length = models.IntegerField(default=0, blank=True, null=True)
+    title = models.CharField(max_length=200, blank=True, null=True)
+    organisation = models.CharField(max_length=200, blank=True, null=True)
+    license = models.TextField(blank=True, null=True)
 
     class Meta:
         verbose_name = _(u'Uploaded Media')
